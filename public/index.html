@@ -182,100 +182,124 @@
         <!-- Search results will be displayed here -->
     </div>
 
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            const searchInput = document.getElementById('searchInput');
-            const searchBtn = document.getElementById('searchBtn');
-            const feelingLuckyBtn = document.getElementById('feelingLuckyBtn');
-            const resultsContainer = document.getElementById('resultsContainer');
-            
-            // Check for system theme preference changes
-            window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
-                // This will trigger when the user changes their system theme
-                console.log(`Theme changed to ${e.matches ? "dark" : "light"} mode`);
-            });
+   <!-- Update only the JavaScript part of your index.html -->
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const searchInput = document.getElementById('searchInput');
+        const searchBtn = document.getElementById('searchBtn');
+        const feelingLuckyBtn = document.getElementById('feelingLuckyBtn');
+        const resultsContainer = document.getElementById('resultsContainer');
+        
+        // Check for system theme preference changes
+        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+            // This will trigger when the user changes their system theme
+            console.log(`Theme changed to ${e.matches ? "dark" : "light"} mode`);
+        });
 
-            // Handle regular search
-            searchBtn.addEventListener('click', function() {
+        // Handle regular search
+        searchBtn.addEventListener('click', function() {
+            searchFiles(searchInput.value);
+        });
+
+        // Handle "I'm Feeling Lucky" - automatically download the first match
+        feelingLuckyBtn.addEventListener('click', function() {
+            searchFiles(searchInput.value, true);
+        });
+
+        // Handle Enter key in search box
+        searchInput.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
                 searchFiles(searchInput.value);
-            });
-
-            // Handle "I'm Feeling Lucky" - automatically download the first match
-            feelingLuckyBtn.addEventListener('click', function() {
-                searchFiles(searchInput.value, true);
-            });
-
-            // Handle Enter key in search box
-            searchInput.addEventListener('keypress', function(e) {
-                if (e.key === 'Enter') {
-                    searchFiles(searchInput.value);
-                }
-            });
-
-            // Function to search for files
-            function searchFiles(query, feelingLucky = false) {
-                if (!query.trim()) return;
-
-                // Make a request to the backend
-                fetch(`/api/search?q=${encodeURIComponent(query)}`)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (feelingLucky && data.results.length > 0) {
-                            // Automatically download the first result
-                            window.location.href = `/api/download?file=${encodeURIComponent(data.results[0].name)}`;
-                        } else {
-                            displayResults(data.results);
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Error searching files:', error);
-                        resultsContainer.innerHTML = '<div class="no-results">An error occurred while searching. Please try again.</div>';
-                        resultsContainer.style.display = 'block';
-                    });
-            }
-
-            // Function to display search results
-            function displayResults(results) {
-                resultsContainer.innerHTML = '';
-                
-                if (results.length === 0) {
-                    resultsContainer.innerHTML = '<div class="no-results">No matching files found. Try a different search term.</div>';
-                } else {
-                    results.forEach(file => {
-                        const resultItem = document.createElement('div');
-                        resultItem.className = 'result-item';
-                        
-                        const resultName = document.createElement('div');
-                        resultName.className = 'result-name';
-                        resultName.textContent = file.name;
-                        
-                        const resultType = document.createElement('div');
-                        resultType.className = 'result-type';
-                        resultType.textContent = `File type: ${file.extension || 'Unknown'}`;
-                        
-                        const downloadBtn = document.createElement('button');
-                        downloadBtn.className = 'download-btn';
-                        downloadBtn.textContent = 'Download';
-                        downloadBtn.addEventListener('click', function() {
-                            window.location.href = `/api/download?file=${encodeURIComponent(file.name)}`;
-                        });
-                        
-                        resultItem.appendChild(resultName);
-                        resultItem.appendChild(resultType);
-                        resultItem.appendChild(downloadBtn);
-                        resultsContainer.appendChild(resultItem);
-                    });
-                }
-                
-                resultsContainer.style.display = 'block';
-                
-                // Clear search results after 20 seconds
-                setTimeout(() => {
-                    resultsContainer.style.display = 'none';
-                    searchInput.value = ''; // Clear the search box
-                }, 20000);
             }
         });
-    </script>
+
+        // Function to search for files
+        function searchFiles(query, feelingLucky = false) {
+            if (!query.trim()) return;
+
+            // Show loading indicator
+            resultsContainer.innerHTML = '<div class="no-results">Searching...</div>';
+            resultsContainer.style.display = 'block';
+            
+            // Log the search attempt
+            console.log(`Searching for: "${query}"`);
+
+            // Make a request to the backend
+            fetch(`/api/search?q=${encodeURIComponent(query)}`)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    console.log('Search results:', data);
+                    
+                    if (feelingLucky && data.results && data.results.length > 0) {
+                        // Automatically download the first result
+                        window.location.href = `/api/download?file=${encodeURIComponent(data.results[0].name)}`;
+                    } else {
+                        displayResults(data.results || []);
+                        
+                        // Display additional debug information if available
+                        if (data.directory) {
+                            console.log(`Files found in: ${data.directory}`);
+                            console.log(`Total files: ${data.file_count || 'unknown'}`);
+                        }
+                    }
+                })
+                .catch(error => {
+                    console.error('Error searching files:', error);
+                    resultsContainer.innerHTML = `<div class="no-results">
+                        Error searching for files: ${error.message}
+                        <br><br>
+                        Please check the console for more details.
+                    </div>`;
+                    resultsContainer.style.display = 'block';
+                });
+        }
+
+        // Function to display search results
+        function displayResults(results) {
+            resultsContainer.innerHTML = '';
+            
+            if (results.length === 0) {
+                resultsContainer.innerHTML = '<div class="no-results">No matching files found. Try a different search term.</div>';
+            } else {
+                results.forEach(file => {
+                    const resultItem = document.createElement('div');
+                    resultItem.className = 'result-item';
+                    
+                    const resultName = document.createElement('div');
+                    resultName.className = 'result-name';
+                    resultName.textContent = file.name;
+                    
+                    const resultType = document.createElement('div');
+                    resultType.className = 'result-type';
+                    resultType.textContent = `File type: ${file.extension || 'Unknown'}`;
+                    
+                    const downloadBtn = document.createElement('button');
+                    downloadBtn.className = 'download-btn';
+                    downloadBtn.textContent = 'Download';
+                    downloadBtn.addEventListener('click', function() {
+                        window.location.href = `/api/download?file=${encodeURIComponent(file.name)}`;
+                    });
+                    
+                    resultItem.appendChild(resultName);
+                    resultItem.appendChild(resultType);
+                    resultItem.appendChild(downloadBtn);
+                    resultsContainer.appendChild(resultItem);
+                });
+            }
+            
+            resultsContainer.style.display = 'block';
+            
+            // Clear search results after 60 seconds instead of 20
+            setTimeout(() => {
+                resultsContainer.style.display = 'none';
+            }, 60000);
+        }
+    });
+</script>
 </body>
 </html>

@@ -1,3 +1,4 @@
+// netlify/functions/search.js
 const fs = require('fs');
 const path = require('path');
 
@@ -6,12 +7,39 @@ exports.handler = async (event) => {
   const query = event.queryStringParameters.q ? event.queryStringParameters.q.toLowerCase() : '';
   
   try {
-    // In Netlify Functions, you need to use path.join with process.env.LAMBDA_TASK_ROOT
-    // to access files in the deployed package
-    const codesDir = path.join(process.cwd(), 'codes');
+    // Try different paths to find the codes directory
+    let codesDir;
+    let files;
     
-    // Read all files from the 'codes' directory
-    const files = fs.readdirSync(codesDir);
+    // Array of possible paths where 'codes' might be located
+    const possiblePaths = [
+      path.join(process.cwd(), 'codes'),
+      path.join(__dirname, '../..', 'codes'),      // From netlify/functions up two levels
+      path.join(__dirname, '../../..', 'codes'),    // Alternative path
+      '/opt/build/repo/codes'                       // Netlify-specific path
+    ];
+    
+    // Try each path until we find one that exists
+    for (const testPath of possiblePaths) {
+      if (fs.existsSync(testPath)) {
+        codesDir = testPath;
+        files = fs.readdirSync(testPath);
+        console.log(`Found codes directory at: ${codesDir}`);
+        break;
+      }
+    }
+    
+    // If no valid path was found
+    if (!codesDir) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ 
+          error: 'Codes directory not found',
+          attempted_paths: possiblePaths
+        }),
+        headers: { 'Content-Type': 'application/json' }
+      };
+    }
     
     // Filter files based on search query
     const results = files
@@ -20,13 +48,18 @@ exports.handler = async (event) => {
         return {
           name: file,
           extension: path.extname(file).replace('.', ''),
-          path: path.join(codesDir, file)
+          path: `/api/download?file=${encodeURIComponent(file)}`
         };
       });
     
     return {
       statusCode: 200,
-      body: JSON.stringify({ results }),
+      body: JSON.stringify({ 
+        results,
+        directory: codesDir,
+        query: query,
+        file_count: files.length
+      }),
       headers: {
         'Content-Type': 'application/json'
       }
@@ -35,7 +68,11 @@ exports.handler = async (event) => {
     console.error('Error searching files:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'An error occurred while searching files' }),
+      body: JSON.stringify({ 
+        error: 'An error occurred while searching files',
+        message: error.message,
+        stack: error.stack
+      }),
       headers: {
         'Content-Type': 'application/json'
       }

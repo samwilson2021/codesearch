@@ -1,3 +1,4 @@
+// netlify/functions/download.js
 const fs = require('fs');
 const path = require('path');
 
@@ -15,13 +16,41 @@ exports.handler = async (event) => {
   }
   
   try {
-    const filePath = path.join(process.cwd(), 'codes', fileName);
+    // Try different paths to find the codes directory
+    let codesDir;
+    let filePath;
     
-    // Check if the file exists
-    if (!fs.existsSync(filePath)) {
+    // Array of possible paths where 'codes' might be located
+    const possiblePaths = [
+      path.join(process.cwd(), 'codes'),
+      path.join(__dirname, '../..', 'codes'),       // From netlify/functions up two levels
+      path.join(__dirname, '../../..', 'codes'),    // Alternative path
+      '/opt/build/repo/codes'                       // Netlify-specific path
+    ];
+    
+    // Try each path until we find one that exists
+    for (const testPath of possiblePaths) {
+      if (fs.existsSync(testPath)) {
+        codesDir = testPath;
+        filePath = path.join(testPath, fileName);
+        
+        // Check if the specific file exists
+        if (fs.existsSync(filePath)) {
+          console.log(`Found file at: ${filePath}`);
+          break;
+        }
+      }
+    }
+    
+    // If no valid path was found or file doesn't exist
+    if (!codesDir || !filePath || !fs.existsSync(filePath)) {
       return {
         statusCode: 404,
-        body: JSON.stringify({ error: 'File not found' }),
+        body: JSON.stringify({ 
+          error: 'File not found',
+          fileName: fileName,
+          attempted_paths: possiblePaths.map(p => path.join(p, fileName))
+        }),
         headers: {
           'Content-Type': 'application/json'
         }
@@ -59,7 +88,10 @@ exports.handler = async (event) => {
     console.error('Error downloading file:', error);
     return {
       statusCode: 500,
-      body: JSON.stringify({ error: 'An error occurred while downloading the file' }),
+      body: JSON.stringify({ 
+        error: 'An error occurred while downloading the file',
+        message: error.message
+      }),
       headers: {
         'Content-Type': 'application/json'
       }
