@@ -1,0 +1,21 @@
+{
+  "name": "code-search-engine",
+  "version": "1.0.0",
+  "description": "A Google-like search engine for code files",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "netlify dev",
+    "build": "mkdir -p public && cp -r public/* public/ || true"
+  },
+  "dependencies": {
+    "express": "^4.18.2"
+  },
+  "devDependencies": {
+    "netlify-cli": "^15.11.0",
+    "nodemon": "^3.0.1"
+  },
+  "engines": {
+    "node": "18.x"
+  }
+}
