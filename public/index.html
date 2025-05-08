@@ -42,11 +42,15 @@
             }
         }
 
+        * {
+            box-sizing: border-box;
+        }
+
         body {
             font-family: Arial, sans-serif;
             margin: 0;
             padding: 0;
-            height: 100vh;
+            min-height: 100vh;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -55,11 +59,13 @@
             transition: background-color 0.3s, color 0.3s;
         }
         .logo-container {
-            margin-top: 150px;
-            margin-bottom: 30px;
+            margin-top: 80px;
+            margin-bottom: 20px;
+            padding: 0 10px;
+            text-align: center;
         }
         .logo {
-            font-size: 70px;
+            font-size: 50px;
             font-weight: bold;
         }
         .logo span:nth-child(1) { color: #4285f4; }
@@ -69,9 +75,10 @@
         .logo span:nth-child(5) { color: #34a853; }
         .logo span:nth-child(6) { color: #ea4335; }
         .search-container {
-            width: 600px;
-            max-width: 90%;
+            width: 90%;
+            max-width: 600px;
             position: relative;
+            margin: 0 auto;
         }
         .search-box {
             width: 100%;
@@ -84,6 +91,7 @@
             box-shadow: 0 1px 6px var(--search-box-shadow);
             background-color: var(--background-color);
             color: var(--text-color);
+            -webkit-appearance: none;
         }
         .search-box:hover, .search-box:focus {
             box-shadow: 0 1px 10px var(--search-box-shadow);
@@ -95,10 +103,13 @@
             color: var(--no-results-color);
         }
         .search-buttons {
-            margin-top: 30px;
+            margin-top: 20px;
             display: flex;
             justify-content: center;
-            gap: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
+            width: 90%;
+            max-width: 600px;
         }
         .search-btn {
             background-color: var(--button-bg);
@@ -109,26 +120,31 @@
             padding: 0 16px;
             height: 36px;
             cursor: pointer;
+            -webkit-appearance: none;
+            min-width: 120px;
+            flex-grow: 1;
+            max-width: 200px;
         }
-        .search-btn:hover {
+        .search-btn:hover, .search-btn:active {
             box-shadow: 0 1px 1px rgba(0,0,0,.1);
             border: 1px solid var(--button-hover-border);
         }
         .results-container {
-            width: 600px;
-            max-width: 90%;
-            margin-top: 30px;
+            width: 90%;
+            max-width: 600px;
+            margin-top: 20px;
             display: none;
         }
         .result-item {
-            margin-bottom: 20px;
-            padding: 15px;
+            margin-bottom: 15px;
+            padding: 12px;
             border-radius: 8px;
             background-color: var(--result-bg);
             border: 1px solid var(--result-border);
+            word-break: break-word;
         }
         .result-name {
-            font-size: 18px;
+            font-size: 16px;
             color: var(--link-color);
             margin-bottom: 8px;
             cursor: pointer;
@@ -145,14 +161,52 @@
             border-radius: 4px;
             cursor: pointer;
             margin-top: 10px;
+            width: 100%;
+            -webkit-appearance: none;
         }
-        .download-btn:hover {
+        .download-btn:hover, .download-btn:active {
             background-color: var(--download-btn-hover);
         }
         .no-results {
             text-align: center;
             color: var(--no-results-color);
             margin-top: 20px;
+            padding: 0 15px;
+        }
+
+        /* Media Queries for Better Mobile Support */
+        @media screen and (max-width: 480px) {
+            .logo {
+                font-size: 40px;
+            }
+            
+            .logo-container {
+                margin-top: 60px;
+            }
+            
+            .search-buttons {
+                flex-direction: column;
+                align-items: center;
+            }
+            
+            .search-btn {
+                width: 100%;
+                max-width: 100%;
+            }
+        }
+
+        /* Fix for iOS input zoom issue */
+        @media screen and (max-width: 768px) {
+            .search-box {
+                font-size: 16px;
+            }
+        }
+
+        /* Ensure touch targets are at least 48px */
+        @media (hover: none) and (pointer: coarse) {
+            .search-btn, .download-btn {
+                min-height: 44px;
+            }
         }
     </style>
 </head>
@@ -212,13 +266,28 @@
                 }
             });
 
+            // Add focus to search input on page load for better mobile UX
+            setTimeout(() => {
+                // Small delay to ensure DOM is fully loaded
+                searchInput.focus();
+            }, 300);
+
             // Function to search for files
             function searchFiles(query, feelingLucky = false) {
                 if (!query.trim()) return;
 
+                // Show loading indicator for better UX
+                resultsContainer.innerHTML = '<div class="no-results">Searching...</div>';
+                resultsContainer.style.display = 'block';
+
                 // Make a request to the backend
                 fetch(`/api/search?q=${encodeURIComponent(query)}`)
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('Network response was not ok');
+                        }
+                        return response.json();
+                    })
                     .then(data => {
                         if (feelingLucky && data.results.length > 0) {
                             // Automatically download the first result
@@ -248,6 +317,11 @@
                         const resultName = document.createElement('div');
                         resultName.className = 'result-name';
                         resultName.textContent = file.name;
+                        resultName.setAttribute('role', 'button');
+                        resultName.setAttribute('tabindex', '0');
+                        resultName.addEventListener('click', function() {
+                            window.location.href = `/api/download?file=${encodeURIComponent(file.name)}`;
+                        });
                         
                         const resultType = document.createElement('div');
                         resultType.className = 'result-type';
@@ -269,12 +343,25 @@
                 
                 resultsContainer.style.display = 'block';
                 
-                // Clear search results after 20 seconds
+                // Clear search results after 30 seconds on mobile (extended from 20)
+                const timeoutDuration = window.innerWidth <= 768 ? 30000 : 20000;
                 setTimeout(() => {
                     resultsContainer.style.display = 'none';
-                    searchInput.value = ''; // Clear the search box
-                }, 20000);
+                    // Don't clear the search box on mobile for better UX
+                    if (window.innerWidth > 768) {
+                        searchInput.value = '';
+                    }
+                }, timeoutDuration);
             }
+
+            // Fix for iOS 100vh issue
+            function setVH() {
+                let vh = window.innerHeight * 0.01;
+                document.documentElement.style.setProperty('--vh', `${vh}px`);
+            }
+            
+            window.addEventListener('resize', setVH);
+            setVH();
         });
     </script>
 </body>
