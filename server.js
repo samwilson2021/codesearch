@@ -16,16 +16,24 @@ app.get('/api/search', (req, res) => {
     const codesDir = path.join(__dirname, 'codes');
     const files = fs.readdirSync(codesDir);
     
-    // Filter files based on search query
-    const results = files
-      .filter(file => file.toLowerCase().includes(query))
-      .map(file => {
-        return {
-          name: file,
-          extension: path.extname(file).replace('.', ''),
-          path: path.join(codesDir, file)
-        };
-      });
+    // If the query is "all", return all files
+    const results = query === "all" 
+      ? files.map(file => {
+          return {
+            name: file,
+            extension: path.extname(file).replace('.', ''),
+            path: path.join(codesDir, file)
+          };
+        })
+      : files
+          .filter(file => file.toLowerCase().includes(query))
+          .map(file => {
+            return {
+              name: file,
+              extension: path.extname(file).replace('.', ''),
+              path: path.join(codesDir, file)
+            };
+          });
     
     res.json({ results });
   } catch (error) {
