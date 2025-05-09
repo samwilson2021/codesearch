@@ -21,6 +21,9 @@
             --download-btn-bg: #4285f4;
             --download-btn-hover: #357ae8;
             --no-results-color: #5f6368;
+            --keyword-chip-bg: #ebf1fb;
+            --keyword-chip-color: #1a73e8;
+            --keyword-chip-border: #dadce0;
         }
 
         @media (prefers-color-scheme: dark) {
@@ -39,6 +42,9 @@
                 --download-btn-bg: #8ab4f8;
                 --download-btn-hover: #aecbfa;
                 --no-results-color: #9aa0a6;
+                --keyword-chip-bg: #303134;
+                --keyword-chip-color: #8ab4f8;
+                --keyword-chip-border: #5f6368;
             }
         }
 
@@ -177,6 +183,13 @@
             margin-top: 20px;
             padding: 0 15px;
         }
+        .search-mode {
+            text-align: center;
+            margin-top: 10px;
+            font-size: 13px;
+            color: var(--no-results-color);
+            display: none;
+        }
 
         /* Media Queries for Better Mobile Support */
         @media screen and (max-width: 480px) {
@@ -232,11 +245,13 @@
                 <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
             </svg>
         </div>
-        <input type="text" class="search-box" id="searchInput" placeholder="Search for files...">
+        <input type="text" class="search-box" id="searchInput" placeholder="Search or type to find it...">
     </div>
 
+    <div class="search-mode" id="searchMode"></div>
+
     <div class="search-buttons">
-        <button class="search-btn" id="searchBtn">Search Files</button>
+        <button class="search-btn" id="searchBtn">Search</button>
         <button class="search-btn" id="feelingLuckyBtn">I'm Feeling Lucky</button>
     </div>
 
@@ -250,6 +265,9 @@
             const searchBtn = document.getElementById('searchBtn');
             const feelingLuckyBtn = document.getElementById('feelingLuckyBtn');
             const resultsContainer = document.getElementById('resultsContainer');
+            const searchMode = document.getElementById('searchMode');
+            
+            const KEYWORD = 'ignite';
             
             // Check for system theme preference changes
             window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
@@ -259,30 +277,74 @@
 
             // Handle regular search
             searchBtn.addEventListener('click', function() {
-                searchFiles(searchInput.value);
+                performSearch(searchInput.value);
             });
 
-            // Handle "I'm Feeling Lucky" - automatically download the first match
+            // Handle "I'm Feeling Lucky" - automatically download the first match or go to first Google result
             feelingLuckyBtn.addEventListener('click', function() {
-                searchFiles(searchInput.value, true);
+                performSearch(searchInput.value, true);
             });
 
             // Handle Enter key in search box
             searchInput.addEventListener('keypress', function(e) {
                 if (e.key === 'Enter') {
-                    searchFiles(searchInput.value);
+                    performSearch(searchInput.value);
                 }
             });
 
-            // No auto-focus to match Google's behavior
-            // Google doesn't auto-focus the search box on mobile
+            // Update search mode indicator when typing
+            searchInput.addEventListener('input', updateSearchModeIndicator);
 
-            // Function to search for files
-            function searchFiles(query, feelingLucky = false) {
+            // Function to update search mode indicator
+            function updateSearchModeIndicator() {
+                const query = searchInput.value.trim();
+                
+                if (query.toLowerCase().startsWith(KEYWORD.toLowerCase())) {
+                    searchMode.textContent = "Code Search Mode";
+                    searchMode.style.color = "var(--keyword-chip-color)";
+                } else {
+                    searchMode.textContent = "";
+                }
+                
+                searchMode.style.display = searchMode.textContent ? "block" : "none";
+            }
+
+            // Function to determine and perform search
+            function performSearch(query, feelingLucky = false) {
                 if (!query.trim()) return;
+                
+                // Check if the query starts with the keyword
+                if (query.toLowerCase().startsWith(KEYWORD.toLowerCase())) {
+                    // Extract the actual search term after the keyword
+                    const actualQuery = query.substring(KEYWORD.length).trim();
+                    
+                    if (actualQuery) {
+                        // Perform code search
+                        searchFiles(actualQuery, feelingLucky);
+                    } else {
+                        // If just the keyword with no search term, prompt for more
+                        resultsContainer.innerHTML = '<div class="no-results">Please enter a search term after "' + KEYWORD + '"</div>';
+                        resultsContainer.style.display = 'block';
+                    }
+                } else {
+                    // Perform Google search
+                    performGoogleSearch(query, feelingLucky);
+                }
+            }
 
+            // Function to perform a Google search
+            function performGoogleSearch(query, feelingLucky = false) {
+                const searchUrl = feelingLucky 
+                    ? `https://www.google.com/search?q=${encodeURIComponent(query)}&btnI=I%27m+Feeling+Lucky`
+                    : `https://www.google.com/search?q=${encodeURIComponent(query)}`;
+                
+                window.location.href = searchUrl;
+            }
+
+            // Function to search for code files
+            function searchFiles(query, feelingLucky = false) {
                 // Show loading indicator for better UX
-                resultsContainer.innerHTML = '<div class="no-results">Searching...</div>';
+                resultsContainer.innerHTML = '<div class="no-results">Searching code files...</div>';
                 resultsContainer.style.display = 'block';
 
                 // Make a request to the backend
@@ -355,6 +417,7 @@
                     // Don't clear the search box on mobile for better UX
                     if (window.innerWidth > 768) {
                         searchInput.value = '';
+                        updateSearchModeIndicator();
                     }
                 }, timeoutDuration);
             }
